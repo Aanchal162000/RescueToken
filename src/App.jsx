@@ -88,7 +88,7 @@ export default function App() {
       setContractTokenBalance("0");
       setTokenContractAddress("");
     }
-  }, [walletAddress, contractAddressInput, ABI]);
+  }, [walletAddress, contractAddressInput]);
 
   const checkNetwork = useCallback(async () => {
     try {
