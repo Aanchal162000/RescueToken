@@ -358,6 +358,23 @@ export default function App() {
     fetchContractTokenBalance,
   ]);
 
+  useEffect(() => {
+    if (
+      contractAddressInput === "0x61eB2237a1657fBeCa7554aa1b10908dE326918F" &&
+      chainId !== ETH_CHAIN_ID &&
+      walletAddress
+    ) {
+      switchNetwork(ETH_CHAIN_ID);
+    }
+    if (
+      contractAddressInput === "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86" &&
+      chainId !== BSC_CHAIN_ID &&
+      walletAddress
+    ) {
+      switchNetwork(BSC_CHAIN_ID);
+    }
+  }, [contractAddressInput, chainId, walletAddress]);
+
   return (
     <div className="main-container">
       <div className="card-container">
@@ -487,7 +504,7 @@ export default function App() {
                   </button>
                 )}
               {contractAddressInput ===
-                "0xE9D7023f2132D55cbd4Ee1f78273CB7a3e74F10A" &&
+                "0x61eB2237a1657fBeCa7554aa1b10908dE326918F" &&
                 chainId !== ETH_CHAIN_ID && (
                   <button
                     className="connect-button mt-2"
@@ -528,8 +545,8 @@ export default function App() {
               <option value="0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86">
                 BNB Contract (0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86)
               </option>
-              <option value="0xE9D7023f2132D55cbd4Ee1f78273CB7a3e74F10A">
-                ETH Contract (0xE9D7023f2132D55cbd4Ee1f78273CB7a3e74F10A)
+              <option value="0x61eB2237a1657fBeCa7554aa1b10908dE326918F">
+                ETH Contract (0x61eB2237a1657fBeCa7554aa1b10908dE326918F)
               </option>
             </select>
             {contractAddressInput &&
@@ -632,7 +649,7 @@ export default function App() {
               "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86" &&
               chainId === BSC_CHAIN_ID) ||
             (contractAddressInput ===
-              "0xE9D7023f2132D55cbd4Ee1f78273CB7a3e74F10A" &&
+              "0x61eB2237a1657fBeCa7554aa1b10908dE326918F" &&
               chainId === ETH_CHAIN_ID) ? (
               <button
                 onClick={recoverTokens}
