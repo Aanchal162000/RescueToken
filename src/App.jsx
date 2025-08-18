@@ -31,6 +31,20 @@ const ERC20_ABI = [
 const ETH_CHAIN_ID = "0x1"; // Ethereum Mainnet
 
 export default function App() {
+  // Contract address constants
+  const ETH_CONTRACTS = [
+    "0x61eB2237a1657fBeCa7554aa1b10908dE326918F",
+    "0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2",
+    "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47",
+  ];
+
+  const BSC_CONTRACTS = [
+    "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86",
+    "0xE434F06f44700a41FA4747bE53163148750a6478",
+    "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47",
+    "0x61eB2237a1657fBeCa7554aa1b10908dE326918F",
+  ];
+
   const [walletAddress, setWalletAddress] = useState("");
   const [amount, setAmount] = useState("");
   const [tokenAddress, setTokenAddress] = useState("");
@@ -360,14 +374,14 @@ export default function App() {
 
   useEffect(() => {
     if (
-      contractAddressInput === "0x61eB2237a1657fBeCa7554aa1b10908dE326918F" &&
+      ETH_CONTRACTS.includes(contractAddressInput) &&
       chainId !== ETH_CHAIN_ID &&
       walletAddress
     ) {
       switchNetwork(ETH_CHAIN_ID);
     }
     if (
-      contractAddressInput === "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86" &&
+      BSC_CONTRACTS.includes(contractAddressInput) &&
       chainId !== BSC_CHAIN_ID &&
       walletAddress
     ) {
@@ -475,11 +489,19 @@ export default function App() {
                     <ExternalLink className="token-contract-address-icon" />
                     <span>Token Contract:</span>
                     <a
-                      href={`https://bscscan.com/address/${tokenContractAddress}`}
+                      href={`https://${
+                        ETH_CONTRACTS.includes(contractAddressInput)
+                          ? "etherscan.io"
+                          : "bscscan.com"
+                      }/address/${tokenContractAddress}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="contract-link"
-                      title="View on BSCScan"
+                      title={`View on ${
+                        ETH_CONTRACTS.includes(contractAddressInput)
+                          ? "Etherscan"
+                          : "BSCScan"
+                      }`}
                     >
                       {tokenContractAddress.slice(0, 6)}...
                       {tokenContractAddress.slice(-4)}
@@ -492,8 +514,7 @@ export default function App() {
           {/* Network switch logic */}
           {walletAddress && (
             <>
-              {contractAddressInput ===
-                "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86" &&
+              {BSC_CONTRACTS.includes(contractAddressInput) &&
                 chainId !== BSC_CHAIN_ID && (
                   <button
                     className="connect-button mt-2"
@@ -503,8 +524,7 @@ export default function App() {
                     Switch to BNB Chain
                   </button>
                 )}
-              {contractAddressInput ===
-                "0x61eB2237a1657fBeCa7554aa1b10908dE326918F" &&
+              {ETH_CONTRACTS.includes(contractAddressInput) &&
                 chainId !== ETH_CHAIN_ID && (
                   <button
                     className="connect-button mt-2"
@@ -542,12 +562,31 @@ export default function App() {
               onBlur={fetchContractTokenBalance}
               disabled={isLoading}
             >
-              <option value="0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86">
-                BNB Contract (0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86)
-              </option>
-              <option value="0x61eB2237a1657fBeCa7554aa1b10908dE326918F">
-                ETH Contract (0x61eB2237a1657fBeCa7554aa1b10908dE326918F)
-              </option>
+              <optgroup label="BSC Contracts">
+                <option value="0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86">
+                  BNB Contract (0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86)
+                </option>
+                <option value="0xE434F06f44700a41FA4747bE53163148750a6478">
+                  BNB Contract (0xE434F06f44700a41FA4747bE53163148750a6478)
+                </option>
+                <option value="0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47">
+                  BNB Contract (0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47)
+                </option>
+                <option value="0x61eB2237a1657fBeCa7554aa1b10908dE326918F">
+                  BNB Contract (0x61eB2237a1657fBeCa7554aa1b10908dE326918F)
+                </option>
+              </optgroup>
+              <optgroup label="ETH Contracts">
+                <option value="0x61eB2237a1657fBeCa7554aa1b10908dE326918F">
+                  ETH Contract (0x61eB2237a1657fBeCa7554aa1b10908dE326918F)
+                </option>
+                <option value="0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2">
+                  ETH Contract (0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2)
+                </option>
+                <option value="0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47">
+                  ETH Contract (0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47)
+                </option>
+              </optgroup>
             </select>
             {contractAddressInput &&
               !validateContractAddress(contractAddressInput) && (
@@ -578,12 +617,22 @@ export default function App() {
               disabled={isLoading}
             >
               <option value="">Select Token</option>
-              <option value="0xE9D7023f2132D55cbd4Ee1f78273CB7a3e74F10A">
-                DEC-BNB (0xE9D7023f2132D55cbd4Ee1f78273CB7a3e74F10A)
-              </option>
-              <option value="0x9393fdc77090F31c7db989390D43F454B1A6E7F3">
-                DEC-ETH (0x9393fdc77090F31c7db989390D43F454B1A6E7F3)
-              </option>
+              <optgroup label="BSC Tokens">
+                <option value="0xE9D7023f2132D55cbd4Ee1f78273CB7a3e74F10A">
+                  DEC-BNB (0xE9D7023f2132D55cbd4Ee1f78273CB7a3e74F10A)
+                </option>
+                <option value="0x1633b7157e7638C4d6593436111Bf125Ee74703F">
+                  SPS-BSC (0x1633b7157e7638C4d6593436111Bf125Ee74703F)
+                </option>
+              </optgroup>
+              <optgroup label="ETH Tokens">
+                <option value="0x9393fdc77090F31c7db989390D43F454B1A6E7F3">
+                  DEC-ETH (0x9393fdc77090F31c7db989390D43F454B1A6E7F3)
+                </option>
+                <option value="0x00813E3421E1367353BfE7615c7f7f133C89df74">
+                  SPS-ETH (0x00813E3421E1367353BfE7615c7f7f133C89df74)
+                </option>
+              </optgroup>
             </select>
             {tokenAddress && !validateTokenAddress(tokenAddress) && (
               <div className="input-error-message">
@@ -645,37 +694,35 @@ export default function App() {
         {/* Action Buttons */}
         <div className="action-buttons">
           {walletAddress &&
-            ((contractAddressInput ===
-              "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86" &&
-              chainId === BSC_CHAIN_ID) ||
-            (contractAddressInput ===
-              "0x61eB2237a1657fBeCa7554aa1b10908dE326918F" &&
-              chainId === ETH_CHAIN_ID) ? (
-              <button
-                onClick={recoverTokens}
-                disabled={
-                  !walletAddress ||
-                  !amount ||
-                  !tokenAddress ||
-                  isLoading ||
-                  parseFloat(amount) <= 0 ||
-                  !ethers.utils.isAddress(contractAddressInput) ||
-                  !ethers.utils.isAddress(tokenAddress)
-                }
-                className="w-full connect-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl text-xl flex items-center justify-center shadow-lg transition-all duration-300 disabled:bg-gray-300 disabled:cursor-not-allowed mt-4"
-              >
-                {isLoading ? (
-                  <span className="loading-spinner-group">
-                    <Loader className="loading-spinner-icon" /> Processing...
-                  </span>
-                ) : (
-                  <>
-                    <Shield className="button-icon" />
-                    Rescue Token
-                  </>
-                )}
-              </button>
-            ) : null)}
+          ((BSC_CONTRACTS.includes(contractAddressInput) &&
+            chainId === BSC_CHAIN_ID) ||
+            (ETH_CONTRACTS.includes(contractAddressInput) &&
+              chainId === ETH_CHAIN_ID)) ? (
+            <button
+              onClick={recoverTokens}
+              disabled={
+                !walletAddress ||
+                !amount ||
+                !tokenAddress ||
+                isLoading ||
+                parseFloat(amount) <= 0 ||
+                !ethers.utils.isAddress(contractAddressInput) ||
+                !ethers.utils.isAddress(tokenAddress)
+              }
+              className="w-full connect-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl text-xl flex items-center justify-center shadow-lg transition-all duration-300 disabled:bg-gray-300 disabled:cursor-not-allowed mt-4"
+            >
+              {isLoading ? (
+                <span className="loading-spinner-group">
+                  <Loader className="loading-spinner-icon" /> Processing...
+                </span>
+              ) : (
+                <>
+                  <Shield className="button-icon" />
+                  Rescue Token
+                </>
+              )}
+            </button>
+          ) : null}
         </div>
 
         {/* Status */}
@@ -709,8 +756,8 @@ export default function App() {
         <div className="footer-container">
           <div className="footer-content">
             <p className="footer-text">
-              Ensure MetaMask is connected to BSC Mainnet for optimal
-              experience.
+              Ensure MetaMask is connected to the correct network (BSC or ETH)
+              for optimal experience.
             </p>
             <a
               href="https://academy.binance.com/en/articles/how-to-add-binance-smart-chain-to-metamask"
@@ -719,7 +766,7 @@ export default function App() {
               className="footer-link-group"
             >
               <ExternalLink className="footer-link-icon" />
-              <span className="footer-link">Setup BSC Network</span>
+              <span className="footer-link">Setup Networks</span>
             </a>
           </div>
         </div>
