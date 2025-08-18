@@ -387,7 +387,13 @@ export default function App() {
     ) {
       switchNetwork(BSC_CHAIN_ID);
     }
-  }, [contractAddressInput, chainId, walletAddress]);
+  }, [
+    contractAddressInput,
+    chainId,
+    walletAddress,
+    ETH_CONTRACTS,
+    BSC_CONTRACTS,
+  ]);
 
   return (
     <div className="main-container">
