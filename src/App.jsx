@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ethers } from "ethers";
 import {
   Wallet,
@@ -32,18 +32,24 @@ const ETH_CHAIN_ID = "0x1"; // Ethereum Mainnet
 
 export default function App() {
   // Contract address constants
-  const ETH_CONTRACTS = [
-    "0x61eB2237a1657fBeCa7554aa1b10908dE326918F",
-    "0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2",
-    "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47",
-  ];
+  const ETH_CONTRACTS = useMemo(
+    () => [
+      "0x61eB2237a1657fBeCa7554aa1b10908dE326918F",
+      "0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2",
+      "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47",
+    ],
+    []
+  );
 
-  const BSC_CONTRACTS = [
-    "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86",
-    "0xE434F06f44700a41FA4747bE53163148750a6478",
-    "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47",
-    "0x61eB2237a1657fBeCa7554aa1b10908dE326918F",
-  ];
+  const BSC_CONTRACTS = useMemo(
+    () => [
+      "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86",
+      "0xE434F06f44700a41FA4747bE53163148750a6478",
+      "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47",
+      "0x61eB2237a1657fBeCa7554aa1b10908dE326918F",
+    ],
+    []
+  );
 
   const [walletAddress, setWalletAddress] = useState("");
   const [amount, setAmount] = useState("");
