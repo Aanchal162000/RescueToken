@@ -26,29 +26,62 @@ const ABI = [
 
 const ERC20_ABI = [
   "function balanceOf(address account) public view returns (uint256)",
+  "function symbol() public view returns (string)",
+  "function decimals() public view returns (uint8)",
 ];
 
 const ETH_CHAIN_ID = "0x1"; // Ethereum Mainnet
 
 export default function App() {
-  // Contract address constants
-  const ETH_CONTRACTS = useMemo(
+  // Contract address constants with network mapping
+  const CONTRACT_NETWORKS = useMemo(
     () => [
-      "0x61eB2237a1657fBeCa7554aa1b10908dE326918F",
-      "0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2",
-      "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47",
+      // BSC Contracts
+      { address: "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86", network: "BSC" },
+      { address: "0xE434F06f44700a41FA4747bE53163148750a6478", network: "BSC" },
+      { address: "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47", network: "BSC" },
+      { address: "0x61eB2237a1657fBeCa7554aa1b10908dE326918F", network: "BSC" },
+
+      // ETH Contracts
+      { address: "0x61eB2237a1657fBeCa7554aa1b10908dE326918F", network: "ETH" },
+      { address: "0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2", network: "ETH" },
+      { address: "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47", network: "ETH" },
     ],
     []
   );
 
+  // Helper function to get network for a contract address
+  const getContractNetwork = useCallback(
+    (address) => {
+      const contract = CONTRACT_NETWORKS.find((c) => c.address === address);
+      return contract ? contract.network : null;
+    },
+    [CONTRACT_NETWORKS]
+  );
+
+  // Helper function to get display value for select
+  const getContractDisplayValue = useCallback(
+    (address) => {
+      const network = getContractNetwork(address);
+      return network ? `${network}:${address}` : address;
+    },
+    [getContractNetwork]
+  );
+
+  const ETH_CONTRACTS = useMemo(
+    () =>
+      CONTRACT_NETWORKS.filter((contract) => contract.network === "ETH").map(
+        (contract) => contract.address
+      ),
+    [CONTRACT_NETWORKS]
+  );
+
   const BSC_CONTRACTS = useMemo(
-    () => [
-      "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86",
-      "0xE434F06f44700a41FA4747bE53163148750a6478",
-      "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47",
-      "0x61eB2237a1657fBeCa7554aa1b10908dE326918F",
-    ],
-    []
+    () =>
+      CONTRACT_NETWORKS.filter((contract) => contract.network === "BSC").map(
+        (contract) => contract.address
+      ),
+    [CONTRACT_NETWORKS]
   );
 
   const [walletAddress, setWalletAddress] = useState("");
@@ -62,9 +95,13 @@ export default function App() {
   const [contractTokenBalance, setContractTokenBalance] = useState("0");
   const [contractAddressInput, setContractAddressInput] =
     useState(CONTRACT_ADDRESS);
+  const [selectedContractNetwork, setSelectedContractNetwork] = useState("BSC");
   const [tokenContractAddress, setTokenContractAddress] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isUpdatingBalances, setIsUpdatingBalances] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [selectedTokenSymbol, setSelectedTokenSymbol] = useState("");
+  const [selectedTokenDecimals, setSelectedTokenDecimals] = useState(18);
 
   const BSC_CHAIN_ID = "0x38"; // 56 in hex
 
@@ -84,31 +121,35 @@ export default function App() {
     if (
       !window.ethereum ||
       !walletAddress ||
-      !ethers.utils.isAddress(contractAddressInput)
+      !ethers.utils.isAddress(contractAddressInput) ||
+      !ethers.utils.isAddress(tokenAddress)
     )
       return;
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const contractInstance = new ethers.Contract(
-        contractAddressInput,
-        ABI,
-        provider
-      );
-      const tokenAddress = await contractInstance.token();
-      setTokenContractAddress(tokenAddress);
       const tokenContract = new ethers.Contract(
         tokenAddress,
         ERC20_ABI,
         provider
       );
-      const balance = await tokenContract.balanceOf(contractAddressInput);
-      setContractTokenBalance(ethers.utils.formatUnits(balance, 3));
+
+      // Fetch balance, symbol, and decimals
+      const [balance, symbol, decimals] = await Promise.all([
+        tokenContract.balanceOf(contractAddressInput),
+        tokenContract.symbol(),
+        tokenContract.decimals(),
+      ]);
+
+      setContractTokenBalance(ethers.utils.formatUnits(balance, decimals));
+      setSelectedTokenSymbol(symbol);
+      setSelectedTokenDecimals(decimals);
     } catch (error) {
       console.error("Error fetching contract token balance:", error);
       setContractTokenBalance("0");
-      setTokenContractAddress("");
+      setSelectedTokenSymbol("");
+      setSelectedTokenDecimals(18);
     }
-  }, [walletAddress, contractAddressInput]);
+  }, [walletAddress, contractAddressInput, tokenAddress]);
 
   const checkNetwork = useCallback(async () => {
     try {
@@ -261,6 +302,8 @@ export default function App() {
   const clearForm = () => {
     setAmount("");
     setTokenAddress("");
+    setSelectedTokenSymbol("");
+    setSelectedTokenDecimals(18);
   };
 
   const validateTokenAddress = (address) => {
@@ -269,6 +312,47 @@ export default function App() {
 
   const validateContractAddress = (address) => {
     return ethers.utils.isAddress(address);
+  };
+
+  // Function to check if contract has tokens before attempting recovery
+  const checkContractTokenBalance = async (
+    contractAddress,
+    tokenAddress,
+    decimals
+  ) => {
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const tokenContract = new ethers.Contract(
+        tokenAddress,
+        ERC20_ABI,
+        provider
+      );
+      const balance = await tokenContract.balanceOf(contractAddress);
+      const formattedBalance = ethers.utils.formatUnits(balance, decimals);
+      console.log(
+        `Contract ${contractAddress} has ${formattedBalance} tokens of ${tokenAddress}`
+      );
+      return parseFloat(formattedBalance);
+    } catch (error) {
+      console.error("Error checking contract token balance:", error);
+      return 0;
+    }
+  };
+
+  // Function to check if the contract function exists and is callable
+  const checkContractFunction = async (contractAddress) => {
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const contract = new ethers.Contract(contractAddress, ABI, provider);
+
+      // Check if the function exists by trying to get its signature
+      const functionFragment = contract.interface.getFunction("recoverTokens");
+      console.log("Function exists:", functionFragment);
+      return true;
+    } catch (error) {
+      console.error("Contract function check failed:", error);
+      return false;
+    }
   };
 
   async function recoverTokens() {
@@ -289,10 +373,36 @@ export default function App() {
       return;
     }
 
-    if (chainId !== BSC_CHAIN_ID) {
+    // Check if we're on the correct network
+    const expectedChainId =
+      selectedContractNetwork === "ETH" ? ETH_CHAIN_ID : BSC_CHAIN_ID;
+    if (chainId !== expectedChainId) {
       setStatus(
-        "Warning: You are not on BSC Mainnet. Transactions might fail. Switch networks or proceed with caution."
+        `Error: You are on ${networkName} but this contract operates on ${
+          selectedContractNetwork === "ETH" ? "Ethereum Mainnet" : "BSC Mainnet"
+        }. Please switch networks.`
       );
+      return;
+    }
+
+    // Check if the amount is greater than available balance
+    const availableBalance = parseFloat(contractTokenBalance);
+    const requestedAmount = parseFloat(amount);
+    if (requestedAmount > availableBalance) {
+      setStatus(
+        `Error: Requested amount (${amount}) exceeds available balance (${availableBalance.toFixed(
+          6
+        )})`
+      );
+      return;
+    }
+
+    // Additional validation: Check if contract actually has tokens
+    if (availableBalance <= 0) {
+      setStatus(
+        `Error: Contract has no ${selectedTokenSymbol || "tokens"} to recover`
+      );
+      return;
     }
 
     try {
@@ -302,10 +412,71 @@ export default function App() {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const contract = new ethers.Contract(contractAddressInput, ABI, signer);
-      const decimals = 3;
-      const parsedAmount = ethers.utils.parseUnits(amount, decimals);
+
+      // Use the stored token decimals
+      const parsedAmount = ethers.utils.parseUnits(
+        amount,
+        selectedTokenDecimals
+      );
+
+      // Debug information
+      console.log("Transaction details:", {
+        contractAddress: contractAddressInput,
+        tokenAddress: tokenAddress,
+        amount: amount,
+        parsedAmount: parsedAmount.toString(),
+        decimals: selectedTokenDecimals,
+        network: selectedContractNetwork,
+        chainId: chainId,
+        walletAddress: walletAddress,
+      });
+
+      // Check if contract function exists
+      setStatus("Checking contract function...");
+      const functionExists = await checkContractFunction(contractAddressInput);
+      if (!functionExists) {
+        setStatus(
+          "Error: Contract does not have the recoverTokens function or it's not accessible"
+        );
+        return;
+      }
+
+      // Double-check contract balance before transaction
+      setStatus("Verifying contract balance...");
+      const actualBalance = await checkContractTokenBalance(
+        contractAddressInput,
+        tokenAddress,
+        selectedTokenDecimals
+      );
+
+      if (actualBalance < requestedAmount) {
+        setStatus(
+          `Error: Contract only has ${actualBalance.toFixed(6)} ${
+            selectedTokenSymbol || "tokens"
+          }, but you're trying to recover ${requestedAmount.toFixed(6)}`
+        );
+        return;
+      }
 
       setStatus("Please confirm transaction in MetaMask...");
+
+      // Try to estimate gas first to catch any issues
+      try {
+        const gasEstimate = await contract.estimateGas.recoverTokens(
+          tokenAddress,
+          parsedAmount
+        );
+        console.log("Gas estimate:", gasEstimate.toString());
+      } catch (gasError) {
+        console.error("Gas estimation failed:", gasError);
+        setStatus(
+          `Error: Gas estimation failed. This usually means the contract doesn't have enough ${
+            selectedTokenSymbol || "tokens"
+          } or the function call is invalid.`
+        );
+        return;
+      }
+
       const tx = await contract.recoverTokens(tokenAddress, parsedAmount);
 
       setStatus(`Transaction submitted! Hash: ${tx.hash}`);
@@ -314,15 +485,28 @@ export default function App() {
       setStatus("Tokens recovered successfully!");
       setAmount("");
       setTokenAddress("");
+      setSelectedTokenSymbol("");
+      setSelectedTokenDecimals(18);
       await updateBalance();
       await fetchContractTokenBalance();
     } catch (err) {
-      console.error(err);
+      console.error("Recover tokens error:", err);
       if (err.code === 4001) {
         setStatus("Transaction cancelled by user");
-      } else if (err.code === -32603) {
+      } else if (
+        err.code === -32603 ||
+        err.message?.includes("UNPREDICTABLE_GAS_LIMIT")
+      ) {
         setStatus(
-          "Transaction failed: Insufficient funds or contract error. Ensure you are on BSC Mainnet."
+          `Transaction failed: The contract may not have enough ${
+            selectedTokenSymbol || "tokens"
+          } to recover, or you may not have permission. Please check the amount and try again.`
+        );
+      } else if (err.message?.includes("execution reverted")) {
+        setStatus(
+          `Transaction failed: Contract execution reverted. This usually means the contract doesn't have enough ${
+            selectedTokenSymbol || "tokens"
+          } to recover or the operation is not allowed.`
         );
       } else {
         setStatus(
@@ -366,40 +550,43 @@ export default function App() {
     }
   };
 
-  // Update fetchContractTokenBalance to run when contractAddressInput or tokenAddress changes
+  // Update balances when contractAddressInput or tokenAddress changes
   useEffect(() => {
-    if (walletAddress && contractAddressInput) {
-      fetchContractTokenBalance();
+    if (walletAddress && contractAddressInput && tokenAddress) {
+      setIsUpdatingBalances(true);
+      Promise.all([fetchContractTokenBalance(), updateBalance()]).finally(
+        () => {
+          setIsUpdatingBalances(false);
+        }
+      );
+    } else if (walletAddress && contractAddressInput) {
+      // Only update wallet balance if no token is selected
+      setIsUpdatingBalances(true);
+      updateBalance().finally(() => {
+        setIsUpdatingBalances(false);
+      });
+      // Clear token symbol and decimals when no token is selected
+      setSelectedTokenSymbol("");
+      setSelectedTokenDecimals(18);
     }
   }, [
     walletAddress,
     contractAddressInput,
     tokenAddress,
     fetchContractTokenBalance,
+    updateBalance,
   ]);
 
   useEffect(() => {
-    if (
-      ETH_CONTRACTS.includes(contractAddressInput) &&
-      chainId !== ETH_CHAIN_ID &&
-      walletAddress
-    ) {
-      switchNetwork(ETH_CHAIN_ID);
+    if (!contractAddressInput || !walletAddress) return;
+
+    const targetChainId =
+      selectedContractNetwork === "ETH" ? ETH_CHAIN_ID : BSC_CHAIN_ID;
+
+    if (chainId !== targetChainId) {
+      switchNetwork(targetChainId);
     }
-    if (
-      BSC_CONTRACTS.includes(contractAddressInput) &&
-      chainId !== BSC_CHAIN_ID &&
-      walletAddress
-    ) {
-      switchNetwork(BSC_CHAIN_ID);
-    }
-  }, [
-    contractAddressInput,
-    chainId,
-    walletAddress,
-    ETH_CONTRACTS,
-    BSC_CONTRACTS,
-  ]);
+  }, [contractAddressInput, selectedContractNetwork, chainId, walletAddress]);
 
   return (
     <div className="main-container">
@@ -440,13 +627,13 @@ export default function App() {
                 <div className="wallet-info-actions">
                   <button
                     onClick={refreshData}
-                    disabled={isRefreshing}
+                    disabled={isRefreshing || isUpdatingBalances}
                     className="refresh-button"
                     title="Refresh balances"
                   >
                     <RefreshCw
                       className={`refresh-icon ${
-                        isRefreshing ? "spinning" : ""
+                        isRefreshing || isUpdatingBalances ? "spinning" : ""
                       }`}
                     />
                   </button>
@@ -481,42 +668,54 @@ export default function App() {
                     <Droplets className="balance-icon" />
                     <span className="balance-label">BNB Balance:</span>
                     <span className="balance-value">
-                      {parseFloat(balance).toFixed(6)}
+                      {isUpdatingBalances ? (
+                        <Loader className="loading-spinner-icon-small" />
+                      ) : (
+                        parseFloat(balance).toFixed(6)
+                      )}
                     </span>
                   </p>
                 </div>
                 <div className="balance-item">
                   <p className="contract-token-balance-text">
                     <Coins className="contract-token-balance-icon" />
-                    <span className="balance-label">Contract Tokens:</span>
+                    <span className="balance-label">
+                      {selectedTokenSymbol
+                        ? `${selectedTokenSymbol} Tokens:`
+                        : "Contract Tokens:"}
+                    </span>
                     <span className="balance-value">
-                      {parseFloat(contractTokenBalance).toFixed(6)}
+                      {isUpdatingBalances ? (
+                        <Loader className="loading-spinner-icon-small" />
+                      ) : (
+                        parseFloat(contractTokenBalance).toFixed(6)
+                      )}
                     </span>
                   </p>
                 </div>
               </div>
-              {tokenContractAddress && (
+              {tokenAddress && (
                 <div className="token-contract-info">
                   <p className="token-contract-address-text">
                     <ExternalLink className="token-contract-address-icon" />
                     <span>Token Contract:</span>
                     <a
                       href={`https://${
-                        ETH_CONTRACTS.includes(contractAddressInput)
+                        selectedContractNetwork === "ETH"
                           ? "etherscan.io"
                           : "bscscan.com"
-                      }/address/${tokenContractAddress}`}
+                      }/address/${tokenAddress}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="contract-link"
                       title={`View on ${
-                        ETH_CONTRACTS.includes(contractAddressInput)
+                        selectedContractNetwork === "ETH"
                           ? "Etherscan"
                           : "BSCScan"
                       }`}
                     >
-                      {tokenContractAddress.slice(0, 6)}...
-                      {tokenContractAddress.slice(-4)}
+                      {tokenAddress.slice(0, 6)}...
+                      {tokenAddress.slice(-4)}
                     </a>
                   </p>
                 </div>
@@ -526,7 +725,8 @@ export default function App() {
           {/* Network switch logic */}
           {walletAddress && (
             <>
-              {BSC_CONTRACTS.includes(contractAddressInput) &&
+              {contractAddressInput &&
+                selectedContractNetwork === "BSC" &&
                 chainId !== BSC_CHAIN_ID && (
                   <button
                     className="connect-button mt-2"
@@ -536,7 +736,8 @@ export default function App() {
                     Switch to BNB Chain
                   </button>
                 )}
-              {ETH_CONTRACTS.includes(contractAddressInput) &&
+              {contractAddressInput &&
+                selectedContractNetwork === "ETH" &&
                 chainId !== ETH_CHAIN_ID && (
                   <button
                     className="connect-button mt-2"
@@ -569,33 +770,43 @@ export default function App() {
                   ? "input-success"
                   : ""
               }`}
-              value={contractAddressInput}
-              onChange={(e) => setContractAddressInput(e.target.value)}
+              value={`${selectedContractNetwork}:${contractAddressInput}`}
+              onChange={(e) => {
+                const selectedValue = e.target.value;
+                if (selectedValue.includes(":")) {
+                  const [network, address] = selectedValue.split(":");
+                  setContractAddressInput(address);
+                  setSelectedContractNetwork(network);
+                } else {
+                  setContractAddressInput(selectedValue);
+                  setSelectedContractNetwork("BSC"); // Default to BSC for backward compatibility
+                }
+              }}
               onBlur={fetchContractTokenBalance}
               disabled={isLoading}
             >
               <optgroup label="BSC Contracts">
-                <option value="0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86">
+                <option value="BSC:0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86">
                   BNB Contract (0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86)
                 </option>
-                <option value="0xE434F06f44700a41FA4747bE53163148750a6478">
+                <option value="BSC:0xE434F06f44700a41FA4747bE53163148750a6478">
                   BNB Contract (0xE434F06f44700a41FA4747bE53163148750a6478)
                 </option>
-                <option value="0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47">
+                <option value="BSC:0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47">
                   BNB Contract (0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47)
                 </option>
-                <option value="0x61eB2237a1657fBeCa7554aa1b10908dE326918F">
+                <option value="BSC:0x61eB2237a1657fBeCa7554aa1b10908dE326918F">
                   BNB Contract (0x61eB2237a1657fBeCa7554aa1b10908dE326918F)
                 </option>
               </optgroup>
               <optgroup label="ETH Contracts">
-                <option value="0x61eB2237a1657fBeCa7554aa1b10908dE326918F">
+                <option value="ETH:0x61eB2237a1657fBeCa7554aa1b10908dE326918F">
                   ETH Contract (0x61eB2237a1657fBeCa7554aa1b10908dE326918F)
                 </option>
-                <option value="0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2">
+                <option value="ETH:0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2">
                   ETH Contract (0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2)
                 </option>
-                <option value="0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47">
+                <option value="ETH:0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47">
                   ETH Contract (0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47)
                 </option>
               </optgroup>
@@ -706,10 +917,10 @@ export default function App() {
         {/* Action Buttons */}
         <div className="action-buttons">
           {walletAddress &&
-          ((BSC_CONTRACTS.includes(contractAddressInput) &&
-            chainId === BSC_CHAIN_ID) ||
-            (ETH_CONTRACTS.includes(contractAddressInput) &&
-              chainId === ETH_CHAIN_ID)) ? (
+          contractAddressInput &&
+          selectedContractNetwork &&
+          ((selectedContractNetwork === "BSC" && chainId === BSC_CHAIN_ID) ||
+            (selectedContractNetwork === "ETH" && chainId === ETH_CHAIN_ID)) ? (
             <button
               onClick={recoverTokens}
               disabled={
@@ -738,6 +949,18 @@ export default function App() {
         </div>
 
         {/* Status */}
+        {isUpdatingBalances && (
+          <div className="status-message-container info">
+            <Loader className="loading-spinner-icon-small" />
+            <p className="status-text">
+              {tokenAddress
+                ? `Fetching ${
+                    selectedTokenSymbol || "token"
+                  } balance on contract...`
+                : "Updating balances..."}
+            </p>
+          </div>
+        )}
         {status &&
         chainId !== BSC_CHAIN_ID &&
         status.includes("Connected to") ? (
