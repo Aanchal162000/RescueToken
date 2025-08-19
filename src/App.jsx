@@ -50,40 +50,6 @@ export default function App() {
     []
   );
 
-  // Helper function to get network for a contract address
-  const getContractNetwork = useCallback(
-    (address) => {
-      const contract = CONTRACT_NETWORKS.find((c) => c.address === address);
-      return contract ? contract.network : null;
-    },
-    [CONTRACT_NETWORKS]
-  );
-
-  // Helper function to get display value for select
-  const getContractDisplayValue = useCallback(
-    (address) => {
-      const network = getContractNetwork(address);
-      return network ? `${network}:${address}` : address;
-    },
-    [getContractNetwork]
-  );
-
-  const ETH_CONTRACTS = useMemo(
-    () =>
-      CONTRACT_NETWORKS.filter((contract) => contract.network === "ETH").map(
-        (contract) => contract.address
-      ),
-    [CONTRACT_NETWORKS]
-  );
-
-  const BSC_CONTRACTS = useMemo(
-    () =>
-      CONTRACT_NETWORKS.filter((contract) => contract.network === "BSC").map(
-        (contract) => contract.address
-      ),
-    [CONTRACT_NETWORKS]
-  );
-
   const [walletAddress, setWalletAddress] = useState("");
   const [amount, setAmount] = useState("");
   const [tokenAddress, setTokenAddress] = useState("");
@@ -96,7 +62,6 @@ export default function App() {
   const [contractAddressInput, setContractAddressInput] =
     useState(CONTRACT_ADDRESS);
   const [selectedContractNetwork, setSelectedContractNetwork] = useState("BSC");
-  const [tokenContractAddress, setTokenContractAddress] = useState("");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdatingBalances, setIsUpdatingBalances] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
