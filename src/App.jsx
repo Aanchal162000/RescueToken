@@ -287,22 +287,6 @@ export default function App() {
     }
   };
 
-  // Function to check if the contract function exists and is callable
-  const checkContractFunction = async (contractAddress) => {
-    try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const contract = new ethers.Contract(contractAddress, ABI, provider);
-
-      // Check if the function exists by trying to get its signature
-      const functionFragment = contract.interface.getFunction("recoverTokens");
-      console.log("Function exists:", functionFragment);
-      return true;
-    } catch (error) {
-      console.error("Contract function check failed:", error);
-      return false;
-    }
-  };
-
   async function recoverTokens() {
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       setStatus("Please enter a valid amount greater than 0");
@@ -379,16 +363,6 @@ export default function App() {
         walletAddress: walletAddress,
       });
 
-      // Check if contract function exists
-      setStatus("Checking contract function...");
-      const functionExists = await checkContractFunction(contractAddressInput);
-      if (!functionExists) {
-        setStatus(
-          "Error: Contract does not have the recoverTokens function or it's not accessible"
-        );
-        return;
-      }
-
       // Double-check contract balance before transaction
       setStatus("Verifying contract balance...");
       const actualBalance = await checkContractTokenBalance(
@@ -408,24 +382,25 @@ export default function App() {
 
       setStatus("Please confirm transaction in MetaMask...");
 
-      // Try to estimate gas first to catch any issues
+      // Process transaction directly with gas buffer if needed
+      let tx;
       try {
-        const gasEstimate = await contract.estimateGas.recoverTokens(
-          tokenAddress,
-          parsedAmount
-        );
-        console.log("Gas estimate:", gasEstimate.toString());
+        // First try with automatic gas estimation
+        tx = await contract.recoverTokens(tokenAddress, parsedAmount);
       } catch (gasError) {
-        console.error("Gas estimation failed:", gasError);
-        setStatus(
-          `Error: Gas estimation failed. This usually means the contract doesn't have enough ${
-            selectedTokenSymbol || "tokens"
-          } or the function call is invalid.`
-        );
-        return;
-      }
+        console.log("Gas estimation failed, trying with manual gas limit...");
 
-      const tx = await contract.recoverTokens(tokenAddress, parsedAmount);
+        // If gas estimation fails, try with a manual gas limit plus buffer
+        const manualGasLimit = ethers.BigNumber.from("500000"); // 500k gas limit
+        const gasBuffer = ethers.BigNumber.from("100000"); // 100k buffer
+        const totalGasLimit = manualGasLimit.add(gasBuffer);
+
+        console.log("Using manual gas limit:", totalGasLimit.toString());
+
+        tx = await contract.recoverTokens(tokenAddress, parsedAmount, {
+          gasLimit: totalGasLimit,
+        });
+      }
 
       setStatus(`Transaction submitted! Hash: ${tx.hash}`);
       await tx.wait();
