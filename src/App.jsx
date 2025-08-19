@@ -33,23 +33,6 @@ const ERC20_ABI = [
 const ETH_CHAIN_ID = "0x1"; // Ethereum Mainnet
 
 export default function App() {
-  // Contract address constants with network mapping
-  const CONTRACT_NETWORKS = useMemo(
-    () => [
-      // BSC Contracts
-      { address: "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86", network: "BSC" },
-      { address: "0xE434F06f44700a41FA4747bE53163148750a6478", network: "BSC" },
-      { address: "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47", network: "BSC" },
-      { address: "0x61eB2237a1657fBeCa7554aa1b10908dE326918F", network: "BSC" },
-
-      // ETH Contracts
-      { address: "0x61eB2237a1657fBeCa7554aa1b10908dE326918F", network: "ETH" },
-      { address: "0xdE38B4681f7d0634182d032474Fb72E47E9Aa2D2", network: "ETH" },
-      { address: "0x14Ae856ab69F157F8aC05B8a1482D9C31478fb47", network: "ETH" },
-    ],
-    []
-  );
-
   const [walletAddress, setWalletAddress] = useState("");
   const [amount, setAmount] = useState("");
   const [tokenAddress, setTokenAddress] = useState("");
