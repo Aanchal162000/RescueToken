@@ -18,7 +18,7 @@ import "./AppStyles.css"; // Import the new CSS file
 const CONTRACT_ADDRESS = "0x3d0884051A1C244B4eaE7d3af22B12B7F18EBe86";
 const ABI = [
   "function removeLiquidity(uint256 _amount) external",
-  "function recoverTokens(address _token, uint256 _amount) external",
+  "function recoverTokens(address _token, address _receiver, uint256 _amount) external",
   "function getLiquidity() public view returns (uint256)",
   "function getLiquidityToken() public view returns (address)",
   "function token() public view returns (address)",
@@ -50,6 +50,7 @@ export default function App() {
   const [copySuccess, setCopySuccess] = useState(false);
   const [selectedTokenSymbol, setSelectedTokenSymbol] = useState("");
   const [selectedTokenDecimals, setSelectedTokenDecimals] = useState(18);
+  const [receiverAddress, setReceiverAddress] = useState("");
 
   const BSC_CHAIN_ID = "0x38"; // 56 in hex
 
@@ -130,6 +131,10 @@ export default function App() {
     (accounts) => {
       if (accounts.length > 0) {
         setWalletAddress(accounts[0]);
+        // Set receiver address to wallet address if it's empty
+        if (!receiverAddress) {
+          setReceiverAddress(accounts[0]);
+        }
         checkNetwork();
       } else {
         setWalletAddress("");
@@ -139,7 +144,7 @@ export default function App() {
         setStatus("Wallet disconnected.");
       }
     },
-    [checkNetwork]
+    [checkNetwork, receiverAddress]
   );
 
   const handleChainChanged = useCallback(
@@ -158,13 +163,17 @@ export default function App() {
         });
         if (accounts.length > 0) {
           setWalletAddress(accounts[0]);
+          // Set receiver address to wallet address if it's empty
+          if (!receiverAddress) {
+            setReceiverAddress(accounts[0]);
+          }
         }
         await checkNetwork();
       } catch (error) {
         console.error("Error checking connection:", error);
       }
     }
-  }, [checkNetwork]);
+  }, [checkNetwork, receiverAddress]);
 
   useEffect(() => {
     checkConnection();
@@ -206,6 +215,11 @@ export default function App() {
         method: "eth_requestAccounts",
       });
       setWalletAddress(accounts[0]);
+
+      // Set receiver address to wallet address if it's empty
+      if (!receiverAddress) {
+        setReceiverAddress(accounts[0]);
+      }
 
       await checkNetwork();
       setIsLoading(false);
@@ -252,6 +266,7 @@ export default function App() {
     setTokenAddress("");
     setSelectedTokenSymbol("");
     setSelectedTokenDecimals(18);
+    setReceiverAddress("");
   };
 
   const validateTokenAddress = (address) => {
@@ -305,6 +320,14 @@ export default function App() {
       return;
     }
 
+    // Use wallet address as default receiver if no receiver address is provided
+    const finalReceiverAddress = receiverAddress || walletAddress;
+
+    if (!ethers.utils.isAddress(finalReceiverAddress)) {
+      setStatus("Please enter a valid receiver address");
+      return;
+    }
+
     // Check if we're on the correct network
     const expectedChainId =
       selectedContractNetwork === "ETH" ? ETH_CHAIN_ID : BSC_CHAIN_ID;
@@ -355,6 +378,7 @@ export default function App() {
       console.log("Transaction details:", {
         contractAddress: contractAddressInput,
         tokenAddress: tokenAddress,
+        receiverAddress: finalReceiverAddress,
         amount: amount,
         parsedAmount: parsedAmount.toString(),
         decimals: selectedTokenDecimals,
@@ -386,7 +410,11 @@ export default function App() {
       let tx;
       try {
         // First try with automatic gas estimation
-        tx = await contract.recoverTokens(tokenAddress, parsedAmount);
+        tx = await contract.recoverTokens(
+          tokenAddress,
+          finalReceiverAddress,
+          parsedAmount
+        );
       } catch (gasError) {
         console.log("Gas estimation failed, trying with manual gas limit...");
 
@@ -397,9 +425,14 @@ export default function App() {
 
         console.log("Using manual gas limit:", totalGasLimit.toString());
 
-        tx = await contract.recoverTokens(tokenAddress, parsedAmount, {
-          gasLimit: totalGasLimit,
-        });
+        tx = await contract.recoverTokens(
+          tokenAddress,
+          finalReceiverAddress,
+          parsedAmount,
+          {
+            gasLimit: totalGasLimit,
+          }
+        );
       }
 
       setStatus(`Transaction submitted! Hash: ${tx.hash}`);
@@ -410,6 +443,7 @@ export default function App() {
       setTokenAddress("");
       setSelectedTokenSymbol("");
       setSelectedTokenDecimals(18);
+      setReceiverAddress("");
       await updateBalance();
       await fetchContractTokenBalance();
     } catch (err) {
@@ -835,6 +869,41 @@ export default function App() {
               </div>
             </div>
           </div>
+
+          {/* Receiver Address Input */}
+          <div className="input-group">
+            <label htmlFor="receiver-address" className="input-label">
+              <Wallet className="label-icon" />
+              Receiver Address (Optional)
+            </label>
+            <input
+              id="receiver-address"
+              type="text"
+              placeholder={walletAddress || "Enter receiver address"}
+              className={`form-input ${
+                receiverAddress && !ethers.utils.isAddress(receiverAddress)
+                  ? "input-error"
+                  : receiverAddress && ethers.utils.isAddress(receiverAddress)
+                  ? "input-success"
+                  : ""
+              }`}
+              value={receiverAddress}
+              onChange={(e) => setReceiverAddress(e.target.value)}
+              disabled={isLoading}
+            />
+            {receiverAddress && !ethers.utils.isAddress(receiverAddress) && (
+              <div className="input-error-message">
+                <AlertCircle className="error-icon" />
+                Invalid receiver address
+              </div>
+            )}
+            {!receiverAddress && (
+              <div className="input-info-message">
+                <CheckCircle className="info-icon" />
+                Will use your wallet address as receiver
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -853,7 +922,8 @@ export default function App() {
                 isLoading ||
                 parseFloat(amount) <= 0 ||
                 !ethers.utils.isAddress(contractAddressInput) ||
-                !ethers.utils.isAddress(tokenAddress)
+                !ethers.utils.isAddress(tokenAddress) ||
+                (receiverAddress && !ethers.utils.isAddress(receiverAddress))
               }
               className="w-full connect-button bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-6 rounded-xl text-xl flex items-center justify-center shadow-lg transition-all duration-300 disabled:bg-gray-300 disabled:cursor-not-allowed mt-4"
             >
